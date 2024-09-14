@@ -1,5 +1,10 @@
 # Doorknob
 
+![License](https://img.shields.io/github/license/Theomund/Doorknob?style=for-the-badge&logo=gnu&logoColor=white)
+![Build](https://img.shields.io/github/actions/workflow/status/Theomund/Doorknob/linux.yml?style=for-the-badge&logo=linux&logoColor=white)
+![Version](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2FTheomund%2FDoorknob%2Fmain%2FCargo.toml&query=package.version&style=for-the-badge&label=version&logo=git&logoColor=white)
+![Channel](https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2FTheomund%2FDoorknob%2Fmain%2Frust-toolchain.toml&query=toolchain.channel&style=for-the-badge&logo=rust&label=toolchain&logoColor=white)
+
 ## Overview
 
 Artificial intelligence program written in Rust.
