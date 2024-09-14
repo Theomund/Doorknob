@@ -1,0 +1,14 @@
+name: linux
+run-name: Linux Workflow
+on: [push]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Build Project
+        uses: devcontainers/ci@v0.3
+        with:
+          push: never
+          runCmd: make all
