@@ -22,6 +22,8 @@ use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 use serenity::Result as SerenityResult;
 use songbird::events::{Event, EventContext, EventHandler as VoiceEventHandler, TrackEvent};
+use songbird::SerenityInit;
+use tracing::{error, info};
 
 struct Handler;
 
@@ -32,7 +34,7 @@ impl VoiceEventHandler for TrackErrorNotifier {
     async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
         if let EventContext::Track(track_list) = ctx {
             for (state, handle) in *track_list {
-                println!(
+                error!(
                     "Track {:?} encountered an error: {:?}",
                     handle.uuid(),
                     state.playing
@@ -46,12 +48,41 @@ impl VoiceEventHandler for TrackErrorNotifier {
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, _: Context, ready: Ready) {
-        println!("{} is connected!", ready.user.name);
+        info!("{} is connected!", ready.user.name);
     }
 
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.author.name != "Doorknob" {
             match msg.content.as_str() {
+                "!deafen" => {
+                    let guild_id = msg.guild_id.expect("Error retrieving guild ID.");
+
+                    let manager = songbird::get(&ctx)
+                        .await
+                        .expect("Songbird client isn't initialized.")
+                        .clone();
+
+                    let Some(handler_lock) = manager.get(guild_id) else {
+                        check_msg(msg.reply(ctx, "I'm not in a voice channel").await);
+                        return;
+                    };
+
+                    let mut handler = handler_lock.lock().await;
+
+                    if handler.is_deaf() {
+                        check_msg(msg.channel_id.say(&ctx.http, "I'm already deafened.").await);
+                    } else {
+                        if let Err(why) = handler.deafen(true).await {
+                            check_msg(
+                                msg.channel_id
+                                    .say(&ctx.http, format!("Failed: {why:?}"))
+                                    .await,
+                            );
+                        }
+
+                        check_msg(msg.channel_id.say(&ctx.http, "I'm now deafened.").await);
+                    }
+                }
                 "!join" => {
                     let (guild_id, channel_id) = {
                         let guild = msg
@@ -72,12 +103,13 @@ impl EventHandler for Handler {
 
                     let manager = songbird::get(&ctx)
                         .await
-                        .expect("Songbird client placed in at initialization.")
+                        .expect("Songbird client is not initialized.")
                         .clone();
 
                     if let Ok(handler_lock) = manager.join(guild_id, connect_to).await {
                         let mut handler = handler_lock.lock().await;
                         handler.add_global_event(TrackEvent::Error.into(), TrackErrorNotifier);
+                        check_msg(msg.channel_id.say(&ctx.http, "Joined voice channel.").await);
                     }
                 }
                 "!leave" => {
@@ -85,16 +117,16 @@ impl EventHandler for Handler {
 
                     let manager = songbird::get(&ctx)
                         .await
-                        .expect("Songbird client placed in at initialization.")
+                        .expect("Songbird client isn't initialized.")
                         .clone();
 
                     let has_handler = manager.get(guild_id).is_some();
 
                     if has_handler {
-                        if let Err(e) = manager.remove(guild_id).await {
+                        if let Err(why) = manager.remove(guild_id).await {
                             check_msg(
                                 msg.channel_id
-                                    .say(&ctx.http, format!("Failed: {e:?}"))
+                                    .say(&ctx.http, format!("Failed: {why:?}"))
                                     .await,
                             );
                         }
@@ -104,12 +136,103 @@ impl EventHandler for Handler {
                         check_msg(msg.reply(ctx, "I'm not in a voice channel.").await);
                     }
                 }
+                "!mute" => {
+                    let guild_id = msg.guild_id.expect("Error retrieving guild ID.");
+
+                    let manager = songbird::get(&ctx)
+                        .await
+                        .expect("Songbird client isn't initialized.")
+                        .clone();
+
+                    let Some(handler_lock) = manager.get(guild_id) else {
+                        check_msg(msg.reply(ctx, "I'm not in a voice channel").await);
+                        return;
+                    };
+
+                    let mut handler = handler_lock.lock().await;
+
+                    if handler.is_mute() {
+                        check_msg(msg.reply(ctx, "I'm already muted.").await);
+                    } else {
+                        if let Err(why) = handler.mute(true).await {
+                            check_msg(
+                                msg.channel_id
+                                    .say(&ctx.http, format!("Failed: {why:?}"))
+                                    .await,
+                            );
+                        }
+
+                        check_msg(msg.channel_id.say(&ctx.http, "I'm now muted.").await);
+                    }
+                }
                 "!ping" => {
                     check_msg(msg.channel_id.say(&ctx.http, "Pong!").await);
                 }
-                _ => {
-                    unimplemented!();
+                "!undeafen" => {
+                    let guild_id = msg.guild_id.expect("Error retrieving guild ID.");
+
+                    let manager = songbird::get(&ctx)
+                        .await
+                        .expect("Songbird client isn't initialized.")
+                        .clone();
+
+                    let Some(handler_lock) = manager.get(guild_id) else {
+                        check_msg(msg.reply(ctx, "I'm not in a voice channel").await);
+                        return;
+                    };
+
+                    let mut handler = handler_lock.lock().await;
+
+                    if handler.is_deaf() {
+                        if let Err(why) = handler.deafen(false).await {
+                            check_msg(
+                                msg.channel_id
+                                    .say(&ctx.http, format!("Failed: {why:?}"))
+                                    .await,
+                            );
+                        }
+
+                        check_msg(msg.channel_id.say(&ctx.http, "I'm now undeafened.").await);
+                    } else {
+                        check_msg(msg.reply(ctx, "I'm already undeafened.").await);
+                    }
                 }
+                "!unmute" => {
+                    let guild_id = msg.guild_id.expect("Error retrieving guild ID.");
+
+                    let manager = songbird::get(&ctx)
+                        .await
+                        .expect("Songbird client isn't initialized.")
+                        .clone();
+
+                    let Some(handler_lock) = manager.get(guild_id) else {
+                        check_msg(msg.reply(ctx, "I'm not in a voice channel").await);
+                        return;
+                    };
+
+                    let mut handler = handler_lock.lock().await;
+
+                    if handler.is_mute() {
+                        if let Err(why) = handler.mute(false).await {
+                            check_msg(
+                                msg.channel_id
+                                    .say(&ctx.http, format!("Failed: {why:?}"))
+                                    .await,
+                            );
+                        }
+
+                        check_msg(msg.channel_id.say(&ctx.http, "I'm now unmuted.").await);
+                    } else {
+                        check_msg(msg.reply(ctx, "I'm already unmuted.").await);
+                    }
+                }
+                command if command.starts_with('!') => {
+                    check_msg(
+                        msg.reply(ctx, format!("Sorry, I don't know the `{command}` command."))
+                            .await,
+                    );
+                }
+                _ => {}
             }
         }
     }
@@ -117,20 +240,24 @@ impl EventHandler for Handler {
 
 fn check_msg(result: SerenityResult<Message>) {
     if let Err(why) = result {
-        println!("Error sending message: {why:?}");
+        error!("Error sending message: {why:?}");
     }
 }
 
 pub async fn initialize() {
     let token = env::var("DISCORD_TOKEN").expect("Expected the token in an environment variable.");
-    let intents = GatewayIntents::GUILD_MESSAGES
+    let intents = GatewayIntents::GUILDS
+        | GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::DIRECT_MESSAGES
-        | GatewayIntents::MESSAGE_CONTENT;
+        | GatewayIntents::MESSAGE_CONTENT
+        | GatewayIntents::GUILD_VOICE_STATES;
     let mut client = Client::builder(&token, intents)
         .event_handler(Handler)
+        .register_songbird()
         .await
         .expect("Error creating client.");
     if let Err(why) = client.start().await {
-        println!("Client error: {why:?}");
+        info!("Client error: {why:?}");
     }
+    info!("Initialized the Discord module.");
 }
