@@ -14,13 +14,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#![warn(clippy::pedantic)]
+use tracing::info;
 
-mod discord;
-mod logger;
-
-#[tokio::main]
-async fn main() {
-    logger::initialize();
-    discord::initialize().await;
+pub fn initialize() {
+    tracing_subscriber::fmt::init();
+    info!("Initialized the logger module.");
 }

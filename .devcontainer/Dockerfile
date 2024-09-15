@@ -22,6 +22,7 @@ RUN dnf install -y \
     git-2.46.0 \
     gdb-14.2 \
     make-4.4.1 \
+    opus-devel-1.5.1 \
     && dnf clean all
 RUN dnf copr enable -y mczernek/vale \
     && dnf install -y vale-3.7.1 \
