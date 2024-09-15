@@ -63,24 +63,20 @@ impl EventHandler for Handler {
                         .clone();
 
                     let Some(handler_lock) = manager.get(guild_id) else {
-                        check_msg(msg.reply(ctx, "I'm not in a voice channel").await);
+                        check_msg(msg.reply(&ctx, "I'm not in a voice channel.").await);
                         return;
                     };
 
                     let mut handler = handler_lock.lock().await;
 
                     if handler.is_deaf() {
-                        check_msg(msg.channel_id.say(&ctx.http, "I'm already deafened.").await);
+                        check_msg(msg.reply(&ctx, "I'm already deafened.").await);
                     } else {
                         if let Err(why) = handler.deafen(true).await {
-                            check_msg(
-                                msg.channel_id
-                                    .say(&ctx.http, format!("Failed: {why:?}"))
-                                    .await,
-                            );
+                            check_msg(msg.reply(&ctx, format!("Failed: {why:?}")).await);
                         }
 
-                        check_msg(msg.channel_id.say(&ctx.http, "I'm now deafened.").await);
+                        check_msg(msg.reply(&ctx, "I'm now deafened.").await);
                     }
                 }
                 "!join" => {
@@ -97,7 +93,7 @@ impl EventHandler for Handler {
                     };
 
                     let Some(connect_to) = channel_id else {
-                        check_msg(msg.reply(ctx, "You're not in a voice channel.").await);
+                        check_msg(msg.reply(&ctx, "You're not in a voice channel.").await);
                         return;
                     };
 
@@ -109,7 +105,7 @@ impl EventHandler for Handler {
                     if let Ok(handler_lock) = manager.join(guild_id, connect_to).await {
                         let mut handler = handler_lock.lock().await;
                         handler.add_global_event(TrackEvent::Error.into(), TrackErrorNotifier);
-                        check_msg(msg.channel_id.say(&ctx.http, "Joined voice channel.").await);
+                        check_msg(msg.reply(&ctx, "Joined voice channel.").await);
                     }
                 }
                 "!leave" => {
@@ -124,16 +120,12 @@ impl EventHandler for Handler {
 
                     if has_handler {
                         if let Err(why) = manager.remove(guild_id).await {
-                            check_msg(
-                                msg.channel_id
-                                    .say(&ctx.http, format!("Failed: {why:?}"))
-                                    .await,
-                            );
+                            check_msg(msg.reply(&ctx, format!("Failed: {why:?}")).await);
                         }
 
-                        check_msg(msg.channel_id.say(&ctx.http, "Left voice channel.").await);
+                        check_msg(msg.reply(&ctx, "Left voice channel.").await);
                     } else {
-                        check_msg(msg.reply(ctx, "I'm not in a voice channel.").await);
+                        check_msg(msg.reply(&ctx, "I'm not in a voice channel.").await);
                     }
                 }
                 "!mute" => {
@@ -145,28 +137,24 @@ impl EventHandler for Handler {
                         .clone();
 
                     let Some(handler_lock) = manager.get(guild_id) else {
-                        check_msg(msg.reply(ctx, "I'm not in a voice channel").await);
+                        check_msg(msg.reply(&ctx, "I'm not in a voice channel.").await);
                         return;
                     };
 
                     let mut handler = handler_lock.lock().await;
 
                     if handler.is_mute() {
-                        check_msg(msg.reply(ctx, "I'm already muted.").await);
+                        check_msg(msg.reply(&ctx, "I'm already muted.").await);
                     } else {
                         if let Err(why) = handler.mute(true).await {
-                            check_msg(
-                                msg.channel_id
-                                    .say(&ctx.http, format!("Failed: {why:?}"))
-                                    .await,
-                            );
+                            check_msg(msg.reply(&ctx, format!("Failed: {why:?}")).await);
                         }
 
-                        check_msg(msg.channel_id.say(&ctx.http, "I'm now muted.").await);
+                        check_msg(msg.reply(&ctx, "I'm now muted.").await);
                     }
                 }
                 "!ping" => {
-                    check_msg(msg.channel_id.say(&ctx.http, "Pong!").await);
+                    check_msg(msg.reply(&ctx, "Pong!").await);
                 }
                 "!undeafen" => {
                     let guild_id = msg.guild_id.expect("Error retrieving guild ID.");
@@ -177,7 +165,7 @@ impl EventHandler for Handler {
                         .clone();
 
                     let Some(handler_lock) = manager.get(guild_id) else {
-                        check_msg(msg.reply(ctx, "I'm not in a voice channel").await);
+                        check_msg(msg.reply(&ctx, "I'm not in a voice channel.").await);
                         return;
                     };
 
@@ -185,16 +173,12 @@ impl EventHandler for Handler {
 
                     if handler.is_deaf() {
                         if let Err(why) = handler.deafen(false).await {
-                            check_msg(
-                                msg.channel_id
-                                    .say(&ctx.http, format!("Failed: {why:?}"))
-                                    .await,
-                            );
+                            check_msg(msg.reply(&ctx, format!("Failed: {why:?}")).await);
                         }
 
-                        check_msg(msg.channel_id.say(&ctx.http, "I'm now undeafened.").await);
+                        check_msg(msg.reply(&ctx, "I'm now undeafened.").await);
                     } else {
-                        check_msg(msg.reply(ctx, "I'm already undeafened.").await);
+                        check_msg(msg.reply(&ctx, "I'm already undeafened.").await);
                     }
                 }
                 "!unmute" => {
@@ -206,7 +190,7 @@ impl EventHandler for Handler {
                         .clone();
 
                     let Some(handler_lock) = manager.get(guild_id) else {
-                        check_msg(msg.reply(ctx, "I'm not in a voice channel").await);
+                        check_msg(msg.reply(&ctx, "I'm not in a voice channel.").await);
                         return;
                     };
 
@@ -214,21 +198,17 @@ impl EventHandler for Handler {
 
                     if handler.is_mute() {
                         if let Err(why) = handler.mute(false).await {
-                            check_msg(
-                                msg.channel_id
-                                    .say(&ctx.http, format!("Failed: {why:?}"))
-                                    .await,
-                            );
+                            check_msg(msg.reply(&ctx, format!("Failed: {why:?}")).await);
                         }
 
-                        check_msg(msg.channel_id.say(&ctx.http, "I'm now unmuted.").await);
+                        check_msg(msg.reply(&ctx, "I'm now unmuted.").await);
                     } else {
-                        check_msg(msg.reply(ctx, "I'm already unmuted.").await);
+                        check_msg(msg.reply(&ctx, "I'm already unmuted.").await);
                     }
                 }
-                command if command.starts_with('!') => {
+                cmd if cmd.starts_with('!') => {
                     check_msg(
-                        msg.reply(ctx, format!("Sorry, I don't know the `{command}` command."))
+                        msg.reply(&ctx, format!("Sorry, I don't know the `{cmd}` command."))
                             .await,
                     );
                 }
