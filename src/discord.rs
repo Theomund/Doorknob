@@ -17,6 +17,7 @@
 use std::env;
 
 use crate::chat::complete;
+use crate::image::generate;
 
 use poise::async_trait;
 use poise::serenity_prelude as serenity;
@@ -49,7 +50,7 @@ type Context<'a> = poise::Context<'a, Data, Error>;
 #[poise::command(slash_command, prefix_command)]
 async fn chat(
     ctx: Context<'_>,
-    #[description = "Query string that is passed to the AI."] query: String,
+    #[description = "Query that is passed to the AI."] query: String,
 ) -> Result<(), Error> {
     let response = complete(query.as_str()).await?;
     ctx.reply(response).await?;
@@ -82,6 +83,21 @@ async fn deafen(ctx: Context<'_>) -> Result<(), Error> {
         ctx.reply("I'm now deafened.").await?;
     }
 
+    Ok(())
+}
+
+#[poise::command(slash_command, prefix_command)]
+async fn draw(
+    ctx: Context<'_>,
+    #[description = "Query that is passed to the AI."] query: String,
+) -> Result<(), Error> {
+    let response = generate(query.as_str()).await?;
+    for path in response {
+        ctx.send(
+            poise::CreateReply::default().attachment(serenity::CreateAttachment::path(path).await?),
+        )
+        .await?;
+    }
     Ok(())
 }
 
@@ -244,6 +260,7 @@ pub async fn initialize() {
             commands: vec![
                 chat(),
                 deafen(),
+                draw(),
                 join(),
                 leave(),
                 mute(),

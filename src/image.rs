@@ -14,15 +14,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#![warn(clippy::pedantic)]
+use crate::discord::Error;
 
-mod chat;
-mod discord;
-mod image;
-mod logger;
+use async_openai::{
+    types::{CreateImageRequestArgs, ImageModel, ImageResponseFormat, ImageSize},
+    Client,
+};
+use std::path::PathBuf;
 
-#[tokio::main]
-async fn main() {
-    logger::initialize();
-    discord::initialize().await;
+pub async fn generate(query: &str) -> Result<Vec<PathBuf>, Error> {
+    let client = Client::new();
+    let request = CreateImageRequestArgs::default()
+        .n(1)
+        .model(ImageModel::DallE3)
+        .response_format(ImageResponseFormat::Url)
+        .size(ImageSize::S1024x1024)
+        .prompt(query)
+        .build()?;
+    let response = client.images().create(request).await?;
+    let paths = response.save("./data").await?;
+    Ok(paths)
 }
