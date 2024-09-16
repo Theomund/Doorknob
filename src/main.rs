@@ -16,6 +16,7 @@
 
 #![warn(clippy::pedantic)]
 
+mod chat;
 mod discord;
 mod logger;
 

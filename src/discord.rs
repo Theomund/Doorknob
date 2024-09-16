@@ -16,6 +16,8 @@
 
 use std::env;
 
+use crate::chat::complete;
+
 use poise::async_trait;
 use poise::serenity_prelude as serenity;
 use songbird::events::{Event, EventContext, EventHandler as VoiceEventHandler, TrackEvent};
@@ -41,8 +43,18 @@ impl VoiceEventHandler for TrackErrorNotifier {
 }
 
 struct Data {}
-type Error = Box<dyn std::error::Error + Send + Sync>;
+pub type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
+
+#[poise::command(slash_command, prefix_command)]
+async fn chat(
+    ctx: Context<'_>,
+    #[description = "Query string that is passed to the AI."] query: String,
+) -> Result<(), Error> {
+    let response = complete(query.as_str()).await?;
+    ctx.reply(response).await?;
+    Ok(())
+}
 
 #[poise::command(slash_command, prefix_command)]
 async fn deafen(ctx: Context<'_>) -> Result<(), Error> {
@@ -93,7 +105,7 @@ async fn join(ctx: Context<'_>) -> Result<(), Error> {
 
     let manager = songbird::get(ctx.serenity_context())
         .await
-        .expect("Songbird client is not initialized.")
+        .expect("Songbird client isn't initialized.")
         .clone();
 
     if let Ok(handler_lock) = manager.join(guild_id, connect_to).await {
@@ -230,6 +242,7 @@ pub async fn initialize() {
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![
+                chat(),
                 deafen(),
                 join(),
                 leave(),
