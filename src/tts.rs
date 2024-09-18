@@ -14,16 +14,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#![warn(clippy::pedantic)]
+use crate::discord::Error;
 
-mod chat;
-mod discord;
-mod image;
-mod logger;
-mod tts;
+use async_openai::{
+    types::{CreateSpeechRequestArgs, SpeechModel, Voice},
+    Client,
+};
 
-#[tokio::main]
-async fn main() {
-    logger::initialize();
-    discord::initialize().await;
+pub async fn generate(text: &str) -> Result<(), Error> {
+    let client = Client::new();
+    let request = CreateSpeechRequestArgs::default()
+        .input(text)
+        .model(SpeechModel::Tts1Hd)
+        .voice(Voice::Onyx)
+        .build()?;
+    let response = client.audio().speech(request).await?;
+    response.save("./data/speech.mp3").await?;
+    Ok(())
 }

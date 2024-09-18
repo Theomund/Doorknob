@@ -16,12 +16,14 @@
 
 use std::env;
 
-use crate::chat::complete;
-use crate::image::generate;
+use crate::chat;
+use crate::image;
+use crate::tts;
 
 use poise::async_trait;
 use poise::serenity_prelude as serenity;
 use songbird::events::{Event, EventContext, EventHandler as VoiceEventHandler, TrackEvent};
+use songbird::input::File;
 use songbird::SerenityInit;
 use tracing::{error, info};
 
@@ -52,8 +54,30 @@ async fn chat(
     ctx: Context<'_>,
     #[description = "Query that is passed to the AI."] query: String,
 ) -> Result<(), Error> {
-    let response = complete(query.as_str()).await?;
+    let guild_id = ctx.guild_id().expect("Error retrieving guild ID.");
+
+    let manager = songbird::get(ctx.serenity_context())
+        .await
+        .expect("Songbird client isn't initialized.")
+        .clone();
+
+    let Some(handler_lock) = manager.get(guild_id) else {
+        ctx.reply("I'm not in a voice channel.").await?;
+        return Ok(());
+    };
+
+    let mut handler = handler_lock.lock().await;
+
+    let response = chat::complete(query.as_str()).await?;
+
+    tts::generate(response.as_str()).await?;
+
+    let audio = File::new("./data/speech.mp3");
+
+    handler.play_input(audio.clone().into());
+
     ctx.reply(response).await?;
+
     Ok(())
 }
 
@@ -91,7 +115,7 @@ async fn draw(
     ctx: Context<'_>,
     #[description = "Query that is passed to the AI."] query: String,
 ) -> Result<(), Error> {
-    let response = generate(query.as_str()).await?;
+    let response = image::generate(query.as_str()).await?;
     for path in response {
         ctx.send(
             poise::CreateReply::default().attachment(serenity::CreateAttachment::path(path).await?),
