@@ -20,6 +20,7 @@ mod chat;
 mod discord;
 mod image;
 mod logger;
+mod stt;
 mod tts;
 
 #[tokio::main]

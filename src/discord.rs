@@ -15,30 +15,129 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use std::env;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use crate::chat;
 use crate::image;
 use crate::tts;
 
+use dashmap::DashMap;
 use poise::async_trait;
 use poise::serenity_prelude as serenity;
-use songbird::events::{Event, EventContext, EventHandler as VoiceEventHandler, TrackEvent};
+use songbird::driver::DecodeMode;
+use songbird::events::{Event, EventContext, EventHandler as VoiceEventHandler};
 use songbird::input::File;
+use songbird::model::id::UserId;
+use songbird::model::payload::ClientDisconnect;
+use songbird::model::payload::Speaking;
+use songbird::packet::Packet;
+use songbird::Config;
+use songbird::CoreEvent;
 use songbird::SerenityInit;
-use tracing::{error, info};
+use tracing::{debug, info};
 
-struct TrackErrorNotifier;
+#[derive(Clone)]
+struct Receiver {
+    inner: Arc<InnerReceiver>,
+}
+
+struct InnerReceiver {
+    last_tick_was_empty: AtomicBool,
+    known_ssrcs: DashMap<u32, UserId>,
+}
+
+impl Receiver {
+    pub fn new() -> Receiver {
+        Receiver {
+            inner: Arc::new(InnerReceiver {
+                last_tick_was_empty: AtomicBool::default(),
+                known_ssrcs: DashMap::new(),
+            }),
+        }
+    }
+}
 
 #[async_trait]
-impl VoiceEventHandler for TrackErrorNotifier {
+impl VoiceEventHandler for Receiver {
     async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
-        if let EventContext::Track(track_list) = ctx {
-            for (state, handle) in *track_list {
-                error!(
-                    "Track {:?} encountered an error: {:?}",
-                    handle.uuid(),
-                    state.playing
+        match ctx {
+            EventContext::SpeakingStateUpdate(Speaking {
+                speaking,
+                ssrc,
+                user_id,
+                ..
+            }) => {
+                debug!(
+                    "Speaking state update: user {user_id:?} has SSRC {ssrc:?}, using {speaking:?}"
                 );
+                if let Some(user) = user_id {
+                    self.inner.known_ssrcs.insert(*ssrc, *user);
+                }
+            }
+            EventContext::VoiceTick(tick) => {
+                let speaking = tick.speaking.len();
+                let total_participants = speaking + tick.silent.len();
+                let last_tick_was_empty = self.inner.last_tick_was_empty.load(Ordering::SeqCst);
+
+                if speaking == 0 && !last_tick_was_empty {
+                    debug!("No speakers detected.");
+                    self.inner.last_tick_was_empty.store(true, Ordering::SeqCst);
+                } else if speaking != 0 {
+                    self.inner
+                        .last_tick_was_empty
+                        .store(false, Ordering::SeqCst);
+                    debug!("Voice tick ({speaking}/{total_participants} live):");
+                    for (ssrc, data) in &tick.speaking {
+                        let user_id_str = if let Some(id) = self.inner.known_ssrcs.get(ssrc) {
+                            format!("{:?}", *id)
+                        } else {
+                            "?".into()
+                        };
+
+                        if let Some(decoded_voice) = data.decoded_voice.as_ref() {
+                            let voice_len = decoded_voice.len();
+                            let audio_str = format!(
+                                "first samples from {}: {:?}",
+                                voice_len,
+                                &decoded_voice[..voice_len.min(5)]
+                            );
+
+                            if let Some(packet) = &data.packet {
+                                let rtp = packet.rtp();
+                                debug!(
+                                    "\t{ssrc}/{user_id_str}: packet seq {} ts {} -- {audio_str}",
+                                    rtp.get_sequence().0,
+                                    rtp.get_timestamp().0
+                                );
+                            } else {
+                                debug!("\t{ssrc}/{user_id_str}: Missed packet -- {audio_str}");
+                            }
+                        } else {
+                            debug!("\t{ssrc}/{user_id_str}: Decode disabled.");
+                        }
+                    }
+                }
+            }
+            EventContext::RtpPacket(packet) => {
+                let rtp = packet.rtp();
+                debug!(
+                    "Received voice packet from SSRC {}, sequence {}, timestamp {} -- {}B long",
+                    rtp.get_ssrc(),
+                    rtp.get_sequence().0,
+                    rtp.get_timestamp().0,
+                    rtp.payload().len()
+                );
+            }
+            EventContext::RtcpPacket(data) => {
+                debug!("RTCP packet received: {:?}", data.packet);
+            }
+            EventContext::ClientDisconnect(ClientDisconnect { user_id, .. }) => {
+                debug!("Client disconnected: user {user_id:?}");
+            }
+            _ => {
+                unimplemented!()
             }
         }
         None
@@ -150,7 +249,15 @@ async fn join(ctx: Context<'_>) -> Result<(), Error> {
 
     if let Ok(handler_lock) = manager.join(guild_id, connect_to).await {
         let mut handler = handler_lock.lock().await;
-        handler.add_global_event(TrackEvent::Error.into(), TrackErrorNotifier);
+        let event_receiver = Receiver::new();
+        handler.add_global_event(
+            CoreEvent::SpeakingStateUpdate.into(),
+            event_receiver.clone(),
+        );
+        handler.add_global_event(CoreEvent::RtpPacket.into(), event_receiver.clone());
+        handler.add_global_event(CoreEvent::RtcpPacket.into(), event_receiver.clone());
+        handler.add_global_event(CoreEvent::ClientDisconnect.into(), event_receiver.clone());
+        handler.add_global_event(CoreEvent::VoiceTick.into(), event_receiver.clone());
         ctx.reply("Joined voice channel.").await?;
     }
 
@@ -301,9 +408,10 @@ pub async fn initialize() {
             })
         })
         .build();
+    let config = Config::default().decode_mode(DecodeMode::Decode);
     let mut client = serenity::ClientBuilder::new(token, intents)
         .framework(framework)
-        .register_songbird()
+        .register_songbird_from_config(config)
         .await
         .expect("Error creating client.");
     if let Err(why) = client.start().await {

@@ -13,22 +13,3 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-use crate::discord::Error;
-
-use async_openai::{
-    types::{CreateSpeechRequestArgs, SpeechModel, Voice},
-    Client,
-};
-
-pub async fn generate(text: &str) -> Result<(), Error> {
-    let client = Client::new();
-    let request = CreateSpeechRequestArgs::default()
-        .input(text)
-        .model(SpeechModel::Tts1Hd)
-        .voice(Voice::Echo)
-        .build()?;
-    let response = client.audio().speech(request).await?;
-    response.save("./data/speech.mp3").await?;
-    Ok(())
-}
