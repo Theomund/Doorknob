@@ -22,6 +22,7 @@ use std::sync::Arc;
 use crate::chat;
 use crate::image;
 use crate::tts;
+use crate::types::Error;
 
 use dashmap::DashMap;
 use poise::async_trait;
@@ -145,7 +146,6 @@ impl VoiceEventHandler for Receiver {
 }
 
 struct Data {}
-pub type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
 #[poise::command(slash_command, prefix_command)]
@@ -382,8 +382,8 @@ async fn unmute(ctx: Context<'_>) -> Result<(), Error> {
     Ok(())
 }
 
-pub async fn initialize() {
-    let token = env::var("DISCORD_TOKEN").expect("Expected the token in an environment variable.");
+pub async fn initialize() -> Result<(), Error> {
+    let token = env::var("DISCORD_TOKEN")?;
     let intents =
         serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT;
     let framework = poise::Framework::builder()
@@ -412,10 +412,10 @@ pub async fn initialize() {
     let mut client = serenity::ClientBuilder::new(token, intents)
         .framework(framework)
         .register_songbird_from_config(config)
-        .await
-        .expect("Error creating client.");
+        .await?;
     if let Err(why) = client.start().await {
         info!("Client error: {why:?}");
     }
     info!("Initialized the Discord module.");
+    Ok(())
 }

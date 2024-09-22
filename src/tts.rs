@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::discord::Error;
+use crate::types::Error;
 
 use async_openai::{
     types::{CreateSpeechRequestArgs, SpeechModel, Voice},

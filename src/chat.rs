@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::discord::Error;
+use std::env;
+
+use crate::types::Error;
+
 use async_openai::{
     types::{
         ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
@@ -25,19 +28,20 @@ use async_openai::{
 
 pub async fn complete(query: &str) -> Result<String, Error> {
     let client = Client::new();
-    let prompt = ChatCompletionRequestSystemMessageArgs::default()
-        .content("Your name is Doorknob. You're a conversational chatbot in a Discord server.")
+    let prompt = env::var("PROMPT")?;
+    let system = ChatCompletionRequestSystemMessageArgs::default()
+        .content(prompt)
         .build()
         .unwrap()
         .into();
-    let message = ChatCompletionRequestUserMessageArgs::default()
+    let user = ChatCompletionRequestUserMessageArgs::default()
         .content(query)
         .build()?
         .into();
     let request = CreateChatCompletionRequestArgs::default()
         .max_tokens(512u32)
         .model("gpt-4o")
-        .messages(vec![prompt, message])
+        .messages(vec![system, user])
         .build()?;
     let response = client.chat().create(request).await?;
     let choice = response.choices.first().unwrap();

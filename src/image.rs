@@ -14,13 +14,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::discord::Error;
+use std::path::PathBuf;
+
+use crate::types::Error;
 
 use async_openai::{
     types::{CreateImageRequestArgs, ImageModel, ImageResponseFormat, ImageSize},
     Client,
 };
-use std::path::PathBuf;
 
 pub async fn generate(query: &str) -> Result<Vec<PathBuf>, Error> {
     let client = Client::new();
