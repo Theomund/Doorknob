@@ -19,8 +19,8 @@ RUN dnf install -y \
     bash-completion-2.11 \
     dnf-plugins-core-4.9.0 \
     gcc-14.2.1 \
-    git-2.46.0 \
-    gdb-14.2 \
+    git-2.46.1 \
+    gdb-15.1 \
     make-4.4.1 \
     opus-devel-1.5.1 \
     && dnf clean all

@@ -14,23 +14,4 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#![warn(clippy::pedantic)]
-
-mod chat;
-mod config;
-mod discord;
-mod image;
-mod logger;
-mod stt;
-mod tts;
-mod types;
-
-use crate::types::Error;
-
-#[tokio::main]
-async fn main() -> Result<(), Error> {
-    config::initialize()?;
-    logger::initialize()?;
-    discord::initialize().await?;
-    Ok(())
-}
+pub type Error = Box<dyn std::error::Error + Send + Sync>;

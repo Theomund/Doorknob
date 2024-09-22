@@ -22,9 +22,13 @@ license = "AGPL-3.0-or-later"
 authors = ["Theomund"]
 
 [dependencies]
+async-openai = "0.24.0"
+dashmap = "6.1.0"
+dotenvy = "0.15.7"
 poise = "0.6.1"
 serenity = "0.12.2"
-songbird = "0.4.3"
+songbird = { version = "0.4.3", features = ["receive"] }
+symphonia = { version = "0.5.4", features = ["mp3"] }
 tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread"] }
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"

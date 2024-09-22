@@ -14,9 +14,16 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use tracing::info;
+use std::env;
+use std::str::FromStr;
 
-pub fn initialize() {
-    tracing_subscriber::fmt::init();
+use crate::types::Error;
+
+use tracing::{info, Level};
+
+pub fn initialize() -> Result<(), Error> {
+    let level = Level::from_str(env::var("LOG_LEVEL")?.as_str())?;
+    tracing_subscriber::fmt().with_max_level(level).init();
     info!("Initialized the logger module.");
+    Ok(())
 }
